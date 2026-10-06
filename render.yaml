@@ -4,7 +4,14 @@ services:
   - type: web
     name: crisp-and-cloud
     runtime: node
-    buildCommand: npm install
+    # puppeteer's postinstall downloads chrome + chrome-headless-shell, and the
+    # headless-shell download fails on Render. The app only uses full chrome
+    # (headless: true), so skip the postinstall, install just chrome, and retry
+    # once after clearing a corrupt browser cache.
+    buildCommand: >-
+      PUPPETEER_SKIP_DOWNLOAD=true npm install
+      && (npx puppeteer browsers install chrome
+      || (rm -rf /opt/render/.cache/puppeteer && npx puppeteer browsers install chrome))
     startCommand: node server.js
     healthCheckPath: /health
     envVars:
