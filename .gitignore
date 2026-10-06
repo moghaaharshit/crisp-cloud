@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# WhatsApp session (sensitive — never push)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Logs
+server.log
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

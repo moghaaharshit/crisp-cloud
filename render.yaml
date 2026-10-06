@@ -1,0 +1,12 @@
+# Render Blueprint — deploys frontend (static) + backend (API/WhatsApp) as ONE web service.
+# In Render: New → Blueprint → select this GitHub repo. It's all configured here.
+services:
+  - type: web
+    name: crisp-and-cloud
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: OWNER_NUMBER
+        value: "919058767686"   # change to your number (with country code)
