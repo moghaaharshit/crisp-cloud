@@ -235,4 +235,24 @@ const logoutWhatsApp = async () => {
   console.log('[Disconnect] Disconnected. Click Connect to re-link.');
 };
 
-module.exports = { initializeWhatsApp, getStatus, logoutWhatsApp, sendMessage };
+/**
+ * Delete the saved WhatsApp login session.
+ * Called on every server start so the previous login is always cleared
+ * and the admin must scan a fresh QR to connect (guarantees no stale
+ * session survives an unclean shutdown either).
+ * @returns {boolean} whether a session was actually removed
+ */
+const clearSession = () => {
+  try {
+    if (fs.existsSync(SESSION_DIR)) {
+      fs.rmSync(SESSION_DIR, { recursive: true, force: true, maxRetries: 4 });
+      console.log('[Session] Previous WhatsApp login cleared — fresh QR scan required');
+      return true;
+    }
+  } catch (e) {
+    console.error('[Session] Could not clear login:', e.message);
+  }
+  return false;
+};
+
+module.exports = { initializeWhatsApp, getStatus, logoutWhatsApp, sendMessage, clearSession };

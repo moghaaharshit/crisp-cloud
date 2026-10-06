@@ -3,7 +3,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { initializeWhatsApp, getStatus, logoutWhatsApp, sendMessage } = require('./whatsappClient');
+const { initializeWhatsApp, getStatus, logoutWhatsApp, sendMessage, clearSession } = require('./whatsappClient');
 const { startOrderWatcher, markOrderNotified, startOrderCleanup } = require('./orderWatcher');
 
 const app = express();
@@ -176,8 +176,10 @@ if (require.main === module) {
   const server = app.listen(PORT, () => {
     console.log(`CRISP AND CLOUD server running on port ${PORT}`);
 
-    // Restore WhatsApp session after server is ready (same as auto-reply project)
+    // Fresh QR on every server start: clear any login left from a previous
+    // run (even an unclean shutdown), then bring up WhatsApp for a new scan.
     setTimeout(() => {
+      clearSession();
       initializeWhatsApp();
     }, 1000);
 
