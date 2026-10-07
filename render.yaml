@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: whatsapp-link-system
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+# ACCESS PIN (optional security) Render ke Dashboard > Environment tab me
+# manually add karo: ACCESS_PIN = <koi 4-6 digit pin>

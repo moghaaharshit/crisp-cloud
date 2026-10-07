@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="WhatsApp Link System - QR scan karke WhatsApp connect karo aur message bhejo" />
+  <title>WhatsApp Link System</title>
+
+  <!-- React CDN -->
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+
+  <!-- Socket.IO client (QR realtime refresh ke liye) -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <!-- QR code renderer -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b141a;
+      --panel: #111b21;
+      --panel-2: #1f2c33;
+      --line: #2a3942;
+      --text: #e9edef;
+      --muted: #8696a0;
+      --green: #25d366;
+      --green-dark: #128c7e;
+      --red: #ef5350;
+      --amber: #ffb300;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(37, 211, 102, 0.14), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(18, 140, 126, 0.18), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap { max-width: 940px; margin: 0 auto; padding: 22px 16px 70px; }
+
+    /* ---------- header ---------- */
+    .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center;
+      font-size: 24px; background: linear-gradient(135deg, var(--green), var(--green-dark));
+      box-shadow: 0 8px 24px rgba(37, 211, 102, 0.28);
+    }
+    .brand h1 { font-size: 21px; font-weight: 700; letter-spacing: 0.2px; }
+    .brand p { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+    .pill {
+      font-size: 12.5px; font-weight: 600; padding: 7px 13px; border-radius: 999px;
+      border: 1px solid var(--line); background: var(--panel); display: inline-flex; align-items: center; gap: 8px;
+    }
+    .pill .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+    .pill.green .dot { background: var(--green); box-shadow: 0 0 0 4px rgba(37,211,102,.18); }
+    .pill.amber .dot { background: var(--amber); box-shadow: 0 0 0 4px rgba(255,179,0,.15); }
+    .pill.red .dot { background: var(--red); box-shadow: 0 0 0 4px rgba(239,83,80,.15); }
+    .pill.green { color: #7cf0a8; border-color: rgba(37,211,102,.35); }
+    .pill.amber { color: #ffd97a; border-color: rgba(255,179,0,.3); }
+    .pill.red { color: #ff9a97; border-color: rgba(239,83,80,.3); }
+
+    /* ---------- cards ---------- */
+    .card {
+      background: rgba(17, 27, 33, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px;
+      margin-top: 18px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+    }
+    .card h2 { font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+    .card h2 .step {
+      width: 24px; height: 24px; border-radius: 50%; background: rgba(37,211,102,.15);
+      color: var(--green); font-size: 12.5px; display: grid; place-items: center; font-weight: 800;
+    }
+    .sub { color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.55; }
+
+    /* ---------- QR ---------- */
+    .qr-area { display: flex; gap: 26px; align-items: flex-start; flex-wrap: wrap; margin-top: 18px; }
+    .qr-\boxed {
+      background: #fff; padding: 14px; border-radius: 16px; width: fit-content;
+      display: grid; place-items: center; box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+    .qr-box img, .qr-box canvas { display: block; }
+    .qr-fallback { color: #0b141a; font-size: 10px; word-break: break-all; width: 224px; }
+    .steps { list-style: none; display: grid; gap: 12px; min-width: 230px; flex: 1; }
+    .steps li { display: flex; gap: 11px; font-size: 13.5px; line-height: 1.5; color: #d1d7db; }
+    .steps li b {
+      flex: 0 0 22px; height: 22px; border-radius: 7px; background: var(--panel-2);
+      color: var(--green); font-size: 12px; display: grid; place-items: center;
+    }
+    .hint { margin-top: 16px; font-size: 12.5px; color: var(--muted); background: var(--panel-2);
+      border: 1px dashed var(--line); border-radius: 12px; padding: 11px 13px; line-height: 1.6; }
+
+    .spinner {
+      width: 42px; height: 42px; border-radius: 50%; border: 4px solid var(--line);
+      border-top-color: var(--green); animation: spin 0.9s linear infinite; margin: 12px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .center { text-align: center; padding: 14px 0 4px; }
+    .center p { color: var(--muted); font-size: 13.5px; }
+
+    /* ---------- connected ---------- */
+    .ok-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 16px; }
+    .ok-badge {
+      width: 52px; height: 52px; border-radius: 50%; background: rgba(37,211,102,.14);
+      border: 1px solid rgba(37,211,102,.4); display: grid; place-items: center; font-size: 26px;
+    }
+    .ok-row .who { flex: 1; min-width: 180px; }
+    .ok-row .who .name { font-weight: 700; font-size: 15.5px; }
+    .ok-row .who .jid { color: var(--muted); font-size: 12.5px; margin-top: 3px; word-break: break-all; }
+
+    /* ---------- form ---------- */
+    .form-grid { display: grid; gap: 14px; margin-top: 18px; }
+    label.field-label { font-size: 12.5px; color: var(--muted); font-weight: 600; letter-spacing: .3px;
+      text-transform: uppercase; display: block; margin-bottom: 7px; }
+    .phone-row { display: flex; gap: 10px; }
+    select, input[type="text"], textarea {
+      background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+      border-radius: 12px; padding: 12px 13px; font-size: 15px; font-family: inherit; outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    select:focus, input:focus, textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(37,211,102,.15); }
+    select { flex: 0 0 150px; cursor: pointer; }
+    input[type="text"] { flex: 1; min-width: 0; }
+    textarea { width: 100%; min-height: 110px; resize: vertical; line-height: 1.5; }
+    .preview { font-size: 12.5px; color: var(--muted); margin-top: 7px; }
+    .preview b { color: var(--green); }
+
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      border: none; border-radius: 12px; padding: 12px 20px; font-size: 14.5px; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: transform .08s, opacity .15s, background .15s;
+    }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { background: linear-gradient(135deg, var(--green), var(--green-dark)); color: #04241a; flex: 1; min-width: 170px; }
+    .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+    .btn-danger { background: rgba(239,83,80,.12); border: 1px solid rgba(239,83,80,.45); color: #ff9a97; }
+
+    .locked-note {
+      margin-top: 16px; background: var(--panel-2); border: 1px dashed var(--line); border-radius: 14px;
+      padding: 22px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6;
+    }
+
+    /* ---------- logs ---------- */
+    .logs { list-style: none; display: grid; gap: 9px; margin-top: 14px; max-height: 240px; overflow: auto; }
+    .logs li {
+      display: flex; gap: 10px; align-items: flex-start; font-size: 13px; background: var(--panel-2);
+      border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px;
+    }
+    .logs .tag { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px; }
+    .logs .ok .tag { background: rgba(37,211,102,.16); color: #7cf0a8; }
+    .logs .err .tag { background: rgba(239,83,80,.16); color: #ff9a97; }
+    .logs .time { color: var(--muted); font-size: 11.5px; margin-left: auto; white-space: nowrap; }
+    .empty { color: var(--muted); font-size: 13px; margin-top: 12px; }
+
+    /* ---------- toast ---------- */
+    .toast {
+      position: fixed; right: 16px; bottom: 16px; max-width: 340px; z-index: 50;
+      padding: 13px 16px; border-radius: 13px; font-size: 13.5px; font-weight: 600;
+      box-shadow: 0 14px 34px rgba(0,0,0,.5); animation: pop .18s ease-out;
+      border: 1px solid var(--line); background: var(--panel-2);
+    }
+    .toast.success { border-color: rgba(37,211,102,.5); color: #7cf0a8; }
+    .toast.error { border-color: rgba(239,83,80,.5); color: #ff9a97; }
+    @keyframes pop { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    /* ---------- lock screen ---------- */
+    .lock { max-width: 380px; margin: 12vh auto 0; }
+    .lock .card { margin-top: 0; }
+    .lock input { width: 100%; margin-top: 12px; text-align: center; letter-spacing: 6px; font-weight: 700; }
+
+    footer { margin-top: 26px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.7; }
+
+    @media (max-width: 560px) {
+      .phone-row { flex-direction: column; }
+      select { flex: 1; width: 100%; }
+      .card { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef } = React;
+
+    /* ---------------- data ---------------- */
+    const COUNTRIES = [
+      { code: "+91", name: "India", flag: "🇮🇳" },
+      { code: "+1", name: "USA / Canada", flag: "🇺🇸" },
+      { code: "+44", name: "UK", flag: "🇬🇧" },
+      { code: "+971", name: "UAE", flag: "🇦🇪" },
+      { code: "+92", name: "Pakistan", flag: "🇵🇰" },
+      { code: "+880", name: "Bangladesh", flag: "🇧🇩" },
+      { code: "+977", name: "Nepal", flag: "🇳🇵" },
+      { code: "+94", name: "Sri Lanka", flag: "🇱🇰" },
+      { code: "+966", name: "Saudi Arabia", flag: "🇸🇦" },
+      { code: "+974", name: "Qatar", flag: "🇶🇦" },
+      { code: "+965", name: "Kuwait", flag: "🇰🇼" },
+      { code: "+968", name: "Oman", flag: "🇴🇲" },
+      { code: "+65", name: "Singapore", flag: "🇸🇬" },
+      { code: "+60", name: "Malaysia", flag: "🇲🇾" },
+      { code: "+62", name: "Indonesia", flag: "🇮🇩" },
+      { code: "+63", name: "Philippines", flag: "🇵🇭" },
+      { code: "+66", name: "Thailand", flag: "🇹🇭" },
+      { code: "+82", name: "South Korea", flag: "🇰🇷" },
+      { code: "+81", name: "Japan", flag: "🇯🇵" },
+      { code: "+86", name: "China", flag: "🇨🇳" },
+      { code: "+61", name: "Australia", flag: "🇦🇺" },
+      { code: "+64", name: "New Zealand", flag: "🇳🇿" },
+      { code: "+7", name: "Russia", flag: "🇷🇺" },
+      { code: "+90", name: "Turkey", flag: "🇹🇷" },
+      { code: "+234", name: "Nigeria", flag: "🇳🇬" },
+      { code: "+27", name: "South Africa", flag: "🇿🇦" },
+      { code: "+20", name: "Egypt", flag: "🇪🇬" },
+      { code: "+49", name: "Germany", flag: "🇩🇪" },
+      { code: "+33", name: "France", flag: "🇫🇷" },
+      { code: "+39", name: "Italy", flag: "🇮🇹" },
+      { code: "+34", name: "Spain", flag: "🇪🇸" },
+      { code: "+31", name: "Netherlands", flag: "🇳🇱" },
+      { code: "+46", name: "Sweden", flag: "🇸🇪" },
+      { code: "+47", name: "Norway", flag: "🇳🇴" },
+      { code: "+45", name: "Denmark", flag: "🇩🇰" },
+      { code: "+358", name: "Finland", flag: "🇫🇮" },
+      { code: "+351", name: "Portugal", flag: "🇵🇹" },
+      { code: "+48", name: "Poland", flag: "🇵🇱" },
+      { code: "+43", name: "Austria", flag: "🇦🇹" },
+      { code: "+41", name: "Switzerland", flag: "🇨🇭" },
+      { code: "+32", name: "Belgium", flag: "🇧🇪" },
+      { code: "+353", name: "Ireland", flag: "🇮🇪" },
+    ];
+
+    const STATUS_META = {
+      connecting: { label: "Connecting...", cls: "amber" },
+      qr: { label: "QR ready - Scan kariye", cls: "amber" },
+      connected: { label: "WhatsApp Connected", cls: "green" },
+      disconnected: { label: "Disconnected", cls: "red" },
+    };
+
+    const pinStore = {
+      get: () => localStorage.getItem("wa_pin") || "",
+      set: (v) => localStorage.setItem("wa_pin", v),
+    };
+
+    /* ---------------- app ---------------- */
+    function App() {
+      const [st, setSt] = useState({ status: "connecting", qr: null, user: null, pinRequired: false });
+      const [locked, setLocked] = useState(false);
+      const [pinInput, setPinInput] = useState("");
+      const [serverDown, setServerDown] = useState(false);
+
+      const [country, setCountry] = useState("+91");
+      const [phone, setPhone] = useState("");
+      const [message, setMessage] = useState("");
+      const [sending, setSending] = useState(false);
+
+      const [logs, setLogs] = useState([]);
+      const [toast, setToast] = useState(null);
+
+      const socketRef = useRef(null);
+      const qrBoxRef = useRef(null);
+
+      /* ---- toast auto dismiss ---- */
+      useEffect(() => {
+        if (!toast) return;
+        const t = setTimeout(() => setToast(null), 3600);
+        return () => clearTimeout(t);
+      }, [toast]);
+
+      const showToast = (kind, text) => setToast({ kind, text, id: Date.now() });
+      const addLog = (kind, text) =>
+        setLogs((prev) =>
+          [{ id: Date.now() + Math.random(), kind, text, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 20)
+        );
+
+      /* ---- socket ---- */
+      function connectSocket(p) {
+        if (socketRef.current) return;
+        const s = io({ auth: p ? { pin: p } : {} });
+        socketRef.current = s;
+        s.on("state", (data) => {
+          if (data && data.denied) { setLocked(true); return; }
+          setSt(data);
+          setServerDown(false);
+        });
+        s.on("connect", () => setServerDown(false));
+        s.on("disconnect", () => setServerDown(true));
+        s.on("connect_error", () => setServerDown(true));
+      }
+
+      /* ---- boot: status check -> socket ---- */
+      useEffect(() => {
+        let alive = true;
+        (async () => {
+          try {
+            const headers = {};
+            const p = pinStore.get();
+            if (p) headers["x-pin"] = p;
+            const r = await fetch("/api/status", { headers });
+            if (!alive) return;
+            if (r.status === 401) { setLocked(true); return; }
+            const data = await r.json();
+            setSt(data);
+            connectSocket(p);
+          } catch (e) {
+            if (alive) setServerDown(true);
+          }
+        })();
+        return () => {
+          alive = false;
+          if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
+        };
+      }, []);
+
+      /* ---- QR render ---- */
+      useEffect(() => {
+        const box = qrBoxRef.current;
+        if (!box) return;
+        box.innerHTML = "";
+        if (st.status === "qr" && st.qr) {
+          if (typeof QRCode !== "undefined") {
+            new QRCode(box, {
+              text: st.qr,
+              width: 224,
+              height: 224,
+              colorDark: "#0b141a",
+              colorLight: "#ffffff",
+            });
+          } else {
+            const pre = document.createElement("pre");
+            pre.className = "qr-fallback";
+            pre.textContent = st.qr;
+            box.appendChild(pre);
+          }
+        }
+      }, [st.qr, st.status]);
+
+      /* ---- actions ---- */
+      async function unlock(e) {
+        e.preventDefault();
+        const p = pinInput.trim();
+        if (!p) return;
+        try {
+          const r = await fetch("/api/status", { headers: { "x-pin": p } });
+          if (r.status === 401) {
+            showToast("error", "PIN galat hai, dobara try kariye");
+            return;
+          }
+          pinStore.set(p);
+          const data = await r.json();
+          setSt(data);
+          setLocked(false);
+          connectSocket(p);
+        } catch (err) {
+          showToast("error", "Server se connection nahi hua");
+        }
+      }
+
+      async function callApi(url) {
+        const headers = { "Content-Type": "application/json" };
+        const p = pinStore.get();
+        if (p) headers["x-pin"] = p;
+        const r = await fetch(url, { method: "POST", headers });
+        if (r.status === 401) { setLocked(true); throw new Error("PIN required"); }
+        const data = await r.json().catch(() => ({}));
+        if (socketRef.current) socketRef.current.emit("state-request");
+        return data;
+      }
+
+      async function handleReconnect() {
+        try {
+          await callApi("/api/connect");
+          showToast("success", "Session start ho raha hai...");
+        } catch (e) {
+          if (e.message !== "PIN required") showToast("error", "Reconnect fail ho gaya");
+        }
+      }
+
+      async function handleLogout() {
+        try {
+          await callApi("/api/logout");
+          showToast("success", "WhatsApp disconnect ho gaya - naya QR aayega");
+        } catch (e) {
+          if (e.message !== "PIN required") showToast("error", "Logout fail ho gaya");
+        }
+      }
+
+      async function handleSend(e) {
+        e.preventDefault();
+        if (sending) return;
+        const digits = phone.replace(/\D/g, "");
+        if (!digits) { showToast("error", "Phone number daaliye"); return; }
+        if (!message.trim()) { showToast("error", "Message likhiye"); return; }
+
+        setSending(true);
+        try {
+          const headers = { "Content-Type": "application/json" };
+          const p = pinStore.get();
+          if (p) headers["x-pin"] = p;
+          const r = await fetch("/api/send", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ countryCode: country, phone: digits, message }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (r.status === 401) { setLocked(true); return; }
+          if (data.ok) {
+            showToast("success", "Message bhej diya -> " + data.to);
+            addLog("ok", "Sent to " + data.to + (data.id ? "  id: " + data.id : ""));
+            setMessage("");
+          } else {
+            showToast("error", data.error || "Message nahi bheja");
+            addLog("err", data.error || "Send failed");
+          }
+        } catch (err) {
+          showToast("error", "Server se connection nahi hua");
+          addLog("err", "Network error");
+        } finally {
+          setSending(false);
+        }
+      }
+
+      /* ---- render helpers ---- */
+      const meta = STATUS_META[st.status] || STATUS_META.disconnected;
+      const connected = st.status === "connected";
+      const digits = phone.replace(/\D/g, "");
+      const fullPreview = phone.trim().startsWith("+")
+        ? "+" + digits
+        : country.replace(/\D/g, "") && digits
+        ? "+" + country.replace(/\D/g, "") + " " + digits
+        : country + " ...";
+
+      if (locked) {
+        return (
+          <div className="wrap">
+            <div className="lock">
+              <form className="card" onSubmit={unlock}>
+                <h2><span className="step">#</span> Access PIN</h2>
+                <p className="sub">Is page ko use karne ke liye security PIN daaliye.</p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoFocus
+                  placeholder="••••"
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                />
+                <div className="actions" style={{ marginTop: 14 }}>
+                  <button className="btn-primary" type="submit">Unlock</button>
+                </div>
+              </form>
+              {toast && <div className={"toast " + toast.kind}>{toast.text}</div>}
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="wrap">
+          {/* header */}
+          <div className="head">
+            <div className="brand">
+              <div className="logo">🔗</div>
+              <div>
+                <h1>WhatsApp Link System</h1>
+                <p>QR scan karo → WhatsApp connect → message bhejo</p>
+              </div>
+            </div>
+            <span className={"pill " + meta.cls}>
+              <span className="dot"></span>
+              {serverDown ? "Server offline" : meta.label}
+            </span>
+          </div>
+
+          {/* step 1: connect / QR */}
+          <section className="card">
+            <h2><span className="step">1</span> WhatsApp Connect Karo</h2>
+
+            {st.status === "connecting" && (
+              <div className="center">
+                <div className="spinner"></div>
+                <p>WhatsApp session start ho raha hai... QR aa raha hai.</p>
+              </div>
+            )}
+
+            {st.status === "disconnected" && (
+              <div className="center">
+                <p style={{ marginBottom: 14 }}>Session disconnected hai. Dobara connect kariye.</p>
+                <div className="actions" style={{ justifyContent: "center" }}>
+                  <button className="btn-primary" style={{ flex: "0 0 auto" }} onClick={handleReconnect}>
+                    🔁 Reconnect
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {st.status === "qr" && (
+              <div className="qr-area">
+                <div className="qr-box" ref={qrBoxRef}></div>
+                <ul className="steps">
+                  <li><b>1</b><span>Apne phone me <b style={{ color: "#7cf0a8" }}>WhatsApp</b> kholo.</span></li>
+                  <li><b>2</b><span>Settings → <b style={{ color: "#7cf0a8" }}>Linked Devices</b> → <b style={{ color: "#7cf0a8" }}>Link a Device</b> dabao.</span></li>
+                  <li><b>3</b><span>Upar diya hua <b style={{ color: "#7cf0a8" }}>QR code</b> scan kar lo.</span></li>
+                  <li><b>4</b><span>Scan hote hi status <b style={{ color: "#7cf0a8" }}>Connected</b> ho jayega.</span></li>
+                </ul>
+              </div>
+            )}
+
+            {st.status === "connected" && (
+              <div className="ok-row">
+                <div className="ok-badge">✅</div>
+                <div className="who">
+                  <div className="name">{(st.user && st.user.name) || "WhatsApp Connected"}</div>
+                  <div className="jid">{(st.user && st.user.id) || ""}</div>
+                </div>
+                <div className="actions">
+                  <button className="btn-danger" onClick={handleLogout}>⏏ Disconnect</button>
+                </div>
+              </div>
+            )}
+
+            <div className="hint">
+              ⚠️ QR sirf tumhe dikh raha hai - kisi aur ko ye QR mat dikhao. Scan karte hi
+              tumhara WhatsApp is server se link ho jayega.
+            </div>
+          </section>
+
+          {/* step 2: send form */}
+          <section className="card">
+            <h2><span className="step">2</span> Message Bhejo</h2>
+
+            {!connected ? (
+              <div className="locked-note">
+                📱 WhatsApp connect hone ke baad yahan <b style={{ color: "#7cf0a8" }}>Phone Number</b> aur{" "}
+                <b style={{ color: "#7cf0a8" }}>Message</b> inputs milenge.<br />
+                Pehle upar QR scan kar ke connect kariye.
+              </div>
+            ) : (
+              <form className="form-grid" onSubmit={handleSend}>
+                <div>
+                  <label className="field-label">Phone Number</label>
+                  <div className="phone-row">
+                    <select value={country} onChange={(e) => setCountry(e.target.value)}>
+                      {COUNTRIES.map((c, i) => (
+                        <option key={c.code + i} value={c.code}>
+                          {c.flag} {c.code} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      inputMode="tel"
+                      placeholder="98765 43210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/[^\d\s()+-]/g, ""))}
+                    />
+                  </div>
+                  <div className="preview">Full number: <b>{fullPreview}</b></div>
+                </div>
+
+                <div>
+                  <label className="field-label">Message</label>
+                  <textarea
+                    placeholder="Apna message yahan likhiye..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    maxLength={4096}
+                  />
+                  <div className="preview">{message.length}/4096 characters</div>
+                </div>
+
+                <div className="actions">
+                  <button className="btn-primary" type="submit" disabled={sending}>
+                    {sending ? "⏳ Bhej rahe hain..." : "📤 Send on WhatsApp"}
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    type="button"
+                    onClick={() => { setMessage(""); setPhone(""); }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+
+          {/* activity log */}
+          <section className="card">
+            <h2><span className="step">3</span> Activity Log</h2>
+            {logs.length === 0 ? (
+              <p className="empty">Abhi tak koi message nahi bheja gaya.</p>
+            ) : (
+              <ul className="logs">
+                {logs.map((l) => (
+                  <li key={l.id} className={l.kind}>
+                    <span className="tag">{l.kind === "ok" ? "SENT" : "FAIL"}</span>
+                    <span>{l.text}</span>
+                    <span className="time">{l.time}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <footer>
+            React CDN + Node.js + Baileys (WhatsApp Web) se bana hua system.<br />
+            Sirf apne hi number pe message bhejiye - spam/abuse ke liye nahi.
+          </footer>
+
+          {toast && <div className={"toast " + toast.kind} key={toast.id}>{toast.text}</div>}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

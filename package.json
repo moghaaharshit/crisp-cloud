@@ -1,0 +1,19 @@
+{
+  "name": "whatsapp-link-system",
+  "version": "1.0.0",
+  "description": "WhatsApp Link System - QR se WhatsApp connect karo aur message bhejo (React CDN + Baileys + Node)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.24",
+    "express": "^4.22.3",
+    "pino": "^10.4.0",
+    "socket.io": "^4.8.4"
+  }
+}
