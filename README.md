@@ -1,95 +1,92 @@
-# 🔗 WhatsApp Link System
+# 🍽️ Food Menu + 🔗 WhatsApp Integration
 
-QR scan karke WhatsApp connect karo aur kisi bhi number pe message bhejo — **browser page (React CDN) + Node.js server (Baileys)** se bana hua full system. GitHub pe push karo aur Render pe deploy karo — link khulte hi pura system chalega.
+**CRISP AND CLOUD** food menu (React + Firebase PWA) jisme **WhatsApp Link System** integrate hai — admin panel ka naya **WhatsApp section**: wahan number save hota hai (Firebase) aur **naya order aate hi** order details + Google Map location ke saath WhatsApp notification automatic chalti hai.
 
 ## ✨ Features
 
-- 📱 **QR Connect** — page pe QR generate hota hai, WhatsApp → Linked Devices → Link a Device se scan karo, connect ho jata hai (realtime, Socket.IO se refresh)
-- ✅ **Connected hone ke baad 2 inputs** — Phone Number (country code default **+91 India**, 40+ countries dropdown) aur Message
-- 📤 **Send button** — click karte hi tumhare WhatsApp session se entered number pe message chala jata hai (Baileys se)
-- 🕐 **Activity Log** — har send ka result (SENT/FAIL + time) niche milta hai
-- 🔒 **Optional ACCESS PIN** — env variable se page/API ko PIN se lock kar sakte ho
-- 🔄 **Auto-reconnect** — connection drop hone par khud session restart hota hai
+- 🍔 **Food Menu app** — menu, cart, checkout (location detect), orders, PWA
+- 🔐 **Admin panel** — products, categories, orders, users, payment QR, shop status
+- 💬 **NEW: WhatsApp section (admin)** — sidebar me `💬 WhatsApp`:
+  - 📱 **Order Alert Number input** — number daal ke 💾 Save karo (Firebase `site/whatsapp` me) + 🧪 Test button
+  - 🔗 **WhatsApp Link System embed** — QR connect page wahin iframe me (ya "Open in new tab ↗")
+- 🔔 **Auto order notification** — admin panel khula ho to naya order aate hi saved number pe professional WhatsApp message jata hai (items, total, payment, address + **Google Map link** ke saath)
+- 📱 **QR Connect** — WhatsApp → Linked Devices → Link a Device se scan, realtime Socket.IO status
+- ✅ Manual send — connected hone ke baad Phone (+91 default, 40+ countries) + Message inputs
 
-## 🛠️ Project structure
+## 📁 Project structure
 
 ```
-index.html      → React CDN wala pura frontend (QR + inputs + log)
-server.js       → Express + Socket.IO + Baileys (WhatsApp Web) server
-package.json    → dependencies + npm start script
-render.yaml     → Render one-click blueprint config
-.gitignore      → node_modules aur .wa-auth (session) ko git se ignore karta hai
+Food-Menu-main/
+├── index.html              → Food menu + admin panel (React + Firebase)
+├── firebase-config.js      → Firebase (Firestore/Auth) + Cloudinary config
+├── manifest.json, order.mp3, img1/2.png, logo.png
+└── whatsapp/
+    ├── index.html          → WhatsApp Link System page (React CDN + QR)
+    └── server.js           → Express + Socket.IO + Baileys server
+package.json                → npm start (server yahan se chalta hai)
+render.yaml                 → Render blueprint
 ```
 
-## 💻 Local setup (testing ke liye)
+## 🖥️ Local setup
 
 ```bash
 npm install
 npm start
 ```
 
-Phir browser me kholo → **http://localhost:3000**
+- **http://localhost:3000/** → Food menu (admin panel isi me)
+- **http://localhost:3000/whatsapp** → WhatsApp connect page
 
-1. Page pe QR aayega (10-15 second lag sakte hain)
-2. Phone me WhatsApp → Settings → Linked Devices → Link a Device → QR scan
-3. Status 🟢 **Connected** dikhega → niche 2 inputs mil jayenge
-4. Number (+91 default) aur message daalo → **Send on WhatsApp** dabao
+### Admin panel setup (3 step)
+
+1. Admin login → sidebar me **💬 WhatsApp** section kholo
+2. **Order Alert Number** input me number daalo (example `+919876543210`) → **💾 Save** → **🧪 Test** se confirm karo
+3. Neeche iframe me QR aayega → phone se scan karke WhatsApp **connect** karo (status 🟢 Connected hona chahiye)
+
+Bas! Ab jab bhi naya order aayega, saved number pe message jayega:
+
+```
+🍽️ *NEW ORDER RECEIVED*
+🆔 *Order ID:* #123XYZ
+👤 *Customer:* Rahul
+🛒 *Items Ordered:*
+1. Chicken Biryani × 2  —  ₹498
+💰 *TOTAL: ₹558*
+📍 *Address:* Sector 12, Chandigarh
+🗺️ *Google Map:* https://www.google.com/maps/search/?api=1&query=...
+```
 
 ## 🚀 GitHub + Render deploy
 
-### Step 1: GitHub pe push karo
-
 ```bash
-git init
 git add .
-git commit -m "WhatsApp Link System (React + Baileys)"
-git branch -M main
-git remote add origin https://github.com/<tumhara-username>/<repo-name>.git
-git push -u origin main
+git commit -m "Food menu + WhatsApp order notifications"
+git push
 ```
 
-> `.gitignore` me `node_modules/` aur `.wa-auth/` already included hain — session files kabhi git pe nahi jayengi.
+Render → **New + → Web Service** → repo → Build: `npm install` → Start: `npm start` → deploy. Link kholo:
 
-### Step 2: Render pe deploy karo
+| URL | Kya milega |
+|---|---|
+| `/` | Food menu + admin panel |
+| `/whatsapp` | WhatsApp QR connect system |
 
-1. [render.com](https://render.com) pe login → **New +** → **Web Service**
-2. Apna GitHub repo **connect/select** karo
-3. Settings:
-   - **Runtime:** Node
-   - **Build Command:** `npm install`
-   - **Start Command:** `npm start`
-4. **Create Web Service** → deploy shuru (2-4 minute)
-5. Deploy hone ke baad diya hua link (`https://<name>.onrender.com`) kholo → QR scan karo → **pura system working!**
+> ⚠️ **ACCESS PIN** (recommended): Render → Environment → `ACCESS_PIN` = koi 4-6 digit pin. Bina pin ke koi bhi link pe aakar tumhara WhatsApp session use kar sakta hai.
 
-> 💡 `render.yaml` repo me hai, isliye Render "Blueprint" se bhi auto-setup kar lega (New + → Blueprint → repo select).
+## ⚠️ Notes / limitations
 
-### Step 3 (recommended): ACCESS PIN lagao
+- **Render free tier:** restart/redeploy pe WhatsApp session wipe hota hai → dobara QR scan. Permanent ke liye Disk add karke env `AUTH_DIR=/data/wa-auth` lagao
+- **Order alert tabhi jayega jab:** (a) admin panel open hoga, (b) WhatsApp connected hoga, (c) number saved hoga — warna console me warning aati hai
+- Number format: `+91XXXXXXXXXX` ya seedha 10 digit (`+91` apne aap lagta hai) — Firestore doc: `site/whatsapp { notifyNumber }`
+- Agar food menu kisi aur host pe ho (alag origin) to Firestore `site/whatsapp.serverUrl` me WhatsApp server ka URL daal do (empty = same origin)
+- **WhatsApp ToS:** apne hi orders/customers ke liye use karo, spam nahi
+- Firestore rules me `site` collection ke admin writes allowed hone chahiye (payment QR waise hi save hota hai, to normally already allowed)
 
-Bina PIN ke koi bhi tumhare link pe aakar tumhare WhatsApp session se message bhej sakta hai. Isliye Render pe:
-
-**Environment → Add Environment Variable**
-
-| Key | Value |
-| --- | --- |
-| `ACCESS_PIN` | koi bhi 4-6 digit pin (example: `9834`) |
-
-Set karte hi page pe PIN lock aayega — sahi PIN dalte hi system waisa hi chalega.
-
-## ⚠️ Important notes
-
-- **Render free tier:** service 15 min idle ke baad sleep karti hai aur **redeploy/restart pe WhatsApp session wipe** hota hai — har baar naya QR scan karna padega. Session ko permanently rakhna hai to paid plan me **Disk** add karo (Mount path jaise `/data`) aur env variable lagao: `AUTH_DIR=/data/wa-auth`
-- **First QR:** Render pe pehli baar QR aane me 10-20 second lag sakte hain (server cold start)
-- **WhatsApp ToS:** ye system apne hi personal number ke liye hai. Spam/ bulk marketing ke liye use karna WhatsApp ban ka risk le sakta hai — apne hi known contacts ko message bhejiye
-- **QR kisi ko mat dikhao:** jo is page ka QR scan karega, uska WhatsApp *tumhare* server se link ho jayega (aur ACCESS PIN na ho to koi tumhara session bhi use kar sakta hai)
-
-## 🔌 API reference (developer ke liye)
+## 🔌 API (developer)
 
 | Method | Endpoint | Kaam |
-| --- | --- | --- |
-| GET | `/api/status` | current status + QR (`x-pin` header agar ACCESS_PIN set hai) |
-| POST | `/api/connect` | session (re)start karo |
-| POST | `/api/send` | body: `{ countryCode: "+91", phone: "9876543210", message: "hi" }` |
-| POST | `/api/logout` | WhatsApp unlink + naya QR |
-| WS | Socket.IO `state` event | realtime `{ status, qr, user }` |
-
-Status values: `connecting` → `qr` → `connected` (ya `disconnected`).
+|---|---|---|
+| GET | `/api/status` | status + QR (`x-pin` agar ACCESS_PIN set hai) |
+| POST | `/api/send` | `{ phone: "+91...", message: "..." }` |
+| POST | `/api/connect` / `/api/logout` | session start / unlink |
+| WS | Socket.IO `state` | realtime `{ status, qr, user }` |

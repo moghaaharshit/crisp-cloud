@@ -20,6 +20,10 @@ const PORT = Number(process.env.PORT) || 3000
 // WhatsApp session files yahan save hote hain (Render pe redeploy karne par
 // wipe ho jata hai -> dobara QR scan karna padta hai)
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, '.wa-auth')
+// Food menu project (ek folder upar) + WhatsApp connect page
+const FOOD_DIR = path.join(__dirname, '..')
+const FOOD_PAGE = path.join(FOOD_DIR, 'index.html')
+const WA_PAGE = path.join(__dirname, 'index.html')
 // Optional security PIN: agar set ho to API/socket ko PIN chahiye hoga
 const ACCESS_PIN = process.env.ACCESS_PIN || ''
 
@@ -161,11 +165,28 @@ function handleUpdate(u) {
 }
 
 // ---------------------------------------------------------------------------
+// Pages: Food menu (root) + WhatsApp system (/whatsapp)
+// ---------------------------------------------------------------------------
+// Server ke internal files static serving se block karo
+app.use((req, res, next) => {
+  if (/^\/whatsapp\/(server\.js|package[^/]*\.json|node_modules)/.test(req.path)) {
+    return res.status(404).end()
+  }
+  next()
+})
+
+// WhatsApp connect page (QR system)
+app.get(['/whatsapp', '/whatsapp/'], (req, res) => res.sendFile(WA_PAGE))
+
+// Food menu app (admin panel isi ke andar hai)
+app.get(['/', '/index.html'], (req, res) => res.sendFile(FOOD_PAGE))
+
+// Food menu ke assets (firebase-config.js, images, manifest, order.mp3...)
+app.use(express.static(FOOD_DIR, { index: false }))
+
+// ---------------------------------------------------------------------------
 // REST API
 // ---------------------------------------------------------------------------
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'))
-})
 
 app.get('/api/status', apiGuard, (req, res) => {
   res.json(snapshot())
